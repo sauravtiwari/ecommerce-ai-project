@@ -1,4 +1,4 @@
-z"""Database engine, connection pool, and per-request sessions.
+"""Database engine, connection pool, and per-request sessions.
 
 Three objects live here, and the distinction between them matters:
 

@@ -10,8 +10,10 @@ server without a single `if production:` branch.
 """
 
 from functools import lru_cache
+from typing import Annotated
 
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic import field_validator
+from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 
 class Settings(BaseSettings):
@@ -44,6 +46,38 @@ class Settings(BaseSettings):
     # server quietly connecting to the wrong database, or worse, appearing to
     # work while pointed somewhere it should not be.
     database_url: str
+
+    # --- CORS ---
+    # Which browser origins may read this API's responses.
+    #
+    # The local default covers both spellings of your own machine, because a
+    # browser treats "localhost" and "127.0.0.1" as DIFFERENT origins even
+    # though they resolve to the same place. In production this is overridden
+    # with the real Vercel URL.
+    # `NoDecode` is load-bearing. For any complex type (list, dict, set),
+    # pydantic-settings tries to JSON-decode the environment value inside the
+    # .env source -- which happens BEFORE field validators run. So
+    # `CORS_ORIGINS=http://localhost:3000` blows up as invalid JSON and the
+    # validator below never gets a chance. NoDecode turns that decoding off and
+    # hands the raw string to our validator instead.
+    cors_origins: Annotated[list[str], NoDecode] = [
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+    ]
+
+    @field_validator("cors_origins", mode="before")
+    @classmethod
+    def _split_origins(cls, v: str | list[str]) -> list[str]:
+        """Accept `CORS_ORIGINS=https://a.com,https://b.com` in the .env file.
+
+        Without this, pydantic sees a `list[str]` field and tries to parse the
+        environment value as JSON -- so anything but `["https://a.com"]` fails
+        with a confusing decode error. Splitting on commas is friendlier to
+        type into a Render dashboard field.
+        """
+        if isinstance(v, str):
+            return [origin.strip() for origin in v.split(",") if origin.strip()]
+        return v
 
 
 @lru_cache
