@@ -15,23 +15,7 @@
  */
 
 import LiveHealth from "@/components/live-health";
-
-// The API's address. This will move into an environment variable when we
-// deploy -- localhost means nothing to a server running in Oregon. Hardcoded
-// for now so there is exactly one new concept in this file.
-const API_BASE_URL = "http://127.0.0.1:8000";
-
-// Mirrors the Pydantic HealthResponse in backend/app/main.py. The same
-// contract, written twice in two languages: TypeScript cannot check what
-// arrives over a network, so if the backend changes and this does not, you get
-// `undefined` at runtime rather than a compile error. (FastAPI publishes this
-// shape at /openapi.json, so it can be generated later instead of hand-written.)
-type HealthResponse = {
-  status: "ok" | "degraded";
-  environment: string;
-  database: string;
-  database_time: string | null;
-};
+import { API_BASE_URL, type HealthResponse } from "@/lib/api";
 
 export default async function Home() {
   let health: HealthResponse | null = null;

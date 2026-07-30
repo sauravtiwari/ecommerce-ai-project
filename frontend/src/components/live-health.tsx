@@ -17,14 +17,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 
-const API_BASE_URL = "http://127.0.0.1:8000";
-
-type HealthResponse = {
-  status: "ok" | "degraded";
-  environment: string;
-  database: string;
-  database_time: string | null;
-};
+import { API_BASE_URL, type HealthResponse } from "@/lib/api";
 
 export default function LiveHealth() {
   // Three pieces of state that the Server Component version needed none of.

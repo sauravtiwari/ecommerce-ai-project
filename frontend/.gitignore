@@ -32,6 +32,9 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+# ...but DO commit the template. `.env*` above matches `.env.example` as well,
+# which would silently exclude the one env file that is meant to be shared.
+!.env.example
 
 # vercel
 .vercel
