@@ -47,6 +47,69 @@ class Settings(BaseSettings):
     # work while pointed somewhere it should not be.
     database_url: str
 
+    @field_validator("database_url")
+    @classmethod
+    def _normalise_database_url(cls, v: str) -> str:
+        """Make any provider's Postgres URL usable by SQLAlchemy + asyncpg.
+
+        Neon, Render, Supabase and Heroku all hand you a URL meant for the
+        standard C client library:
+
+            postgresql://user:pass@host/db?sslmode=require&channel_binding=require
+
+        Two things about that string break this stack:
+
+        1. The scheme has no driver. SQLAlchemy's async engine needs
+           `postgresql+asyncpg://`, otherwise it loads the *synchronous*
+           psycopg driver and fails with a confusing "greenlet" error that
+           says nothing about the real cause. (Some providers still emit the
+           ancient `postgres://` scheme, so that is handled too.)
+
+        2. `sslmode` and `channel_binding` are libpq parameters. asyncpg does
+           not understand them and raises `TypeError: connect() got an
+           unexpected keyword argument 'sslmode'`. TLS is still used -- it is
+           configured in db.py via connect_args instead.
+
+        Doing this once, here, means you can paste a provider's URL verbatim
+        and it simply works.
+        """
+        for old, new in (
+            ("postgres://", "postgresql+asyncpg://"),
+            ("postgresql://", "postgresql+asyncpg://"),
+        ):
+            if v.startswith(old):
+                v = v.replace(old, new, 1)
+                break
+
+        if not v.startswith("postgresql+asyncpg://"):
+            raise ValueError(
+                "DATABASE_URL must be a PostgreSQL connection string"
+            )
+
+        # Strip libpq-only query parameters that asyncpg rejects.
+        if "?" in v:
+            base, _, query = v.partition("?")
+            kept = [
+                part
+                for part in query.split("&")
+                if part.split("=")[0]
+                not in {"sslmode", "channel_binding", "options"}
+            ]
+            v = f"{base}?{'&'.join(kept)}" if kept else base
+
+        return v
+
+    @property
+    def is_remote_database(self) -> bool:
+        """True when the database is not on this machine.
+
+        Used by db.py to decide whether to require TLS. Local Postgres does not
+        speak TLS by default; every hosted provider requires it.
+        """
+        return not any(
+            host in self.database_url for host in ("localhost", "127.0.0.1")
+        )
+
     # --- CORS ---
     # Which browser origins may read this API's responses.
     #

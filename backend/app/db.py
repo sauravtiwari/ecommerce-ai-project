@@ -34,6 +34,20 @@ engine: AsyncEngine = create_async_engine(
     # a random failure on the first request after a quiet period, which is
     # maddening to reproduce because it only happens when nobody is looking.
     pool_pre_ping=True,
+    # Hosted providers require TLS and will refuse a plaintext connection.
+    # config.py stripped `sslmode=require` out of the URL because asyncpg does
+    # not accept it as a query parameter -- this is where that requirement is
+    # re-applied, in the form asyncpg does understand.
+    #
+    # Your local Postgres has no TLS configured, so asking for it there would
+    # fail. Hence the conditional.
+    connect_args={"ssl": "require"} if settings.is_remote_database else {},
+    # Free tiers cap total connections hard (Neon's free plan is far lower
+    # than a self-hosted server's default 100). A pool sized for a beefy
+    # machine will exhaust that limit and start refusing connections, so keep
+    # it small and let requests queue briefly instead.
+    pool_size=5,
+    max_overflow=5,
 )
 
 # A factory, not a session. Calling SessionLocal() produces a new session.
