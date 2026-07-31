@@ -1,17 +1,8 @@
 /**
- * Home page -- a SERVER COMPONENT.
+ * Home page -- a Server Component (the App Router default).
  *
- * In the App Router every component is a Server Component unless it opts out
- * with the "use client" directive. This one runs in Node on the server, never
- * in the browser. Two consequences:
- *
- *   1. It can be `async` and `await` right in the render body. There is no
- *      useEffect, no useState, no loading flag -- the HTML is sent to the
- *      browser with the data already baked in.
- *
- *   2. The fetch below is a server-to-server call. No browser is involved, so
- *      the same-origin policy never applies and CORS is irrelevant here.
- *      Remember that when the client-side version of this fails.
+ * Runs in Node, so it can await directly in the render body and the data is
+ * embedded in the HTML. Being server-side, this fetch is not subject to CORS.
  */
 
 import LiveHealth from "@/components/live-health";
@@ -22,19 +13,12 @@ export default async function Home() {
   let error: string | null = null;
 
   try {
-    const res = await fetch(`${API_BASE_URL}/health`, {
-      // Never serve a health check from cache -- a cached "ok" from ten
-      // minutes ago says nothing about right now. Next.js 16 does not cache
-      // fetch by default, but being explicit documents the intent and survives
-      // someone later turning on Cache Components.
-      cache: "no-store",
-    });
+    // Never cache a health check.
+    const res = await fetch(`${API_BASE_URL}/health`, { cache: "no-store" });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     health = await res.json();
   } catch (e) {
-    // The backend being down is a normal condition, not a crash. Catching it
-    // means the page still renders and tells you what is wrong, instead of
-    // showing Next.js's error overlay.
+    // A down backend is an expected state, not a crash -- keep the page up.
     error = e instanceof Error ? e.message : "unknown error";
   }
 
@@ -43,9 +27,7 @@ export default async function Home() {
   return (
     <main className="mx-auto flex min-h-screen max-w-2xl flex-col justify-center gap-8 p-8">
       <div>
-        <h1 className="text-3xl font-semibold tracking-tight">
-          E-Commerce AI
-        </h1>
+        <h1 className="text-3xl font-semibold tracking-tight">E-Commerce AI</h1>
         <p className="mt-2 text-sm text-zinc-500">
           Phase 1 &mdash; proving the stack end to end.
         </p>
@@ -68,7 +50,7 @@ export default async function Home() {
           <div className="mt-4 text-sm">
             <p className="text-red-600 dark:text-red-400">{error}</p>
             <p className="mt-2 text-zinc-500">
-              Is uvicorn running on {API_BASE_URL}?
+              Is the API reachable at {API_BASE_URL}?
             </p>
           </div>
         ) : (
@@ -88,16 +70,11 @@ export default async function Home() {
         )}
       </section>
 
-      {/* A Server Component rendering a Client Component. The server renders
-          a placeholder plus a reference to this component's JavaScript; the
-          browser downloads that JS and takes over from there. */}
       <LiveHealth />
 
       <p className="text-xs leading-relaxed text-zinc-500">
-        This data was fetched on the <strong>server</strong> and embedded in the
-        HTML before it reached your browser. Disable JavaScript and reload
-        &mdash; it still works. View source and you will find the Postgres
-        timestamp already in the markup.
+        The panel above was rendered on the server &mdash; the timestamp is in
+        the HTML source and survives with JavaScript disabled.
       </p>
     </main>
   );

@@ -1,11 +1,5 @@
-# Render Blueprint -- infrastructure as code.
-#
-# Instead of clicking through a dashboard and forgetting what you chose three
-# months later, the service definition lives in the repo, versioned next to the
-# code it runs. Render reads this file when you connect the repository.
-#
-# No `databases:` section here on purpose -- Postgres is hosted on Neon, whose
-# free tier is permanent and ships pgvector (which Phase 9 needs).
+# Render Blueprint -- backend service definition, versioned with the code.
+# Postgres is hosted separately on Neon.
 
 services:
   - type: web
@@ -13,47 +7,28 @@ services:
     runtime: python
     plan: free
     region: oregon
-
-    # The repo root holds both backend/ and frontend/. This tells Render to
-    # treat backend/ as the working directory, so it finds requirements.txt.
     rootDir: backend
 
     buildCommand: pip install -r requirements.txt
 
-    # Two details in this line matter more than they look:
-    #
-    #   --host 0.0.0.0  Bind to every interface, not just loopback. A container
-    #                   listening only on 127.0.0.1 is unreachable from outside
-    #                   itself -- a classic first-deploy failure that presents
-    #                   as an endlessly "starting" service.
-    #
-    #   --port $PORT    Render assigns the port at runtime and injects it as an
-    #                   environment variable. Hardcoding 8000 means Render's
-    #                   proxy sends traffic somewhere nothing is listening.
-    #
-    # Note the absence of --reload: file watching costs memory and CPU and has
-    # no purpose in production.
+    # --host 0.0.0.0 is required: a container bound to loopback is unreachable
+    # from Render's proxy. $PORT is assigned at runtime and must not be hardcoded.
     startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
 
-    # Render polls this path and will not route traffic to a deploy that fails
-    # it. Because our /health actually queries Postgres, a bad DATABASE_URL
-    # fails the deploy loudly instead of shipping a broken service.
+    # Gates the deploy -- and since /health queries Postgres, a bad DATABASE_URL
+    # fails the release instead of shipping a broken service.
     healthCheckPath: /health
 
     envVars:
       - key: ENVIRONMENT
         value: production
 
-      # sync: false means "do not read a value from this file -- prompt me in
-      # the dashboard". Correct for anything secret: this file is committed.
-      # NOTE: no `value:` line here, and there must never be one. This file is
-      # committed to GitHub -- a connection string written here is published to
-      # anyone who can read the repo. The value is typed into the Render
-      # dashboard instead.
+      # sync: false = prompt in the dashboard, never store a value in this file.
+      # This file is committed to GitHub.
       - key: DATABASE_URL
         sync: false
 
-      # Set after the frontend's first Vercel deploy, once you know the URL.
+      # Your Vercel URL, no trailing slash (the Origin header never has one).
       - key: CORS_ORIGINS
         sync: false
 

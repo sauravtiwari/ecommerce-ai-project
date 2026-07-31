@@ -1,18 +1,10 @@
 "use client";
 
 /**
- * The same /health request as page.tsx -- but made from the BROWSER.
+ * The same /health request as page.tsx, but issued by the browser.
  *
- * "use client" is not a styling or organisational choice. It changes where
- * this code executes: the file is compiled to JavaScript, downloaded by the
- * browser, and run there. That unlocks useState/useEffect/onClick, and it is
- * the only way to build anything interactive.
- *
- * It also has a consequence that is about to bite: the fetch below is issued
- * by Chrome, from origin http://localhost:3000, to http://127.0.0.1:8000.
- * Those are different origins, so the browser applies the same-origin policy
- * and the request is subject to CORS. The identical fetch in page.tsx was not,
- * because no browser was involved.
+ * "use client" ships this file to the browser and runs it there, which enables
+ * hooks and event handlers -- and makes the fetch subject to CORS.
  */
 
 import { useCallback, useEffect, useState } from "react";
@@ -20,10 +12,8 @@ import { useCallback, useEffect, useState } from "react";
 import { API_BASE_URL, type HealthResponse } from "@/lib/api";
 
 export default function LiveHealth() {
-  // Three pieces of state that the Server Component version needed none of.
-  // On the server you just `await` and render the answer. In the browser the
-  // component must render BEFORE the data exists, so every possible in-between
-  // state has to be represented explicitly.
+  // Client-side fetching must render before data exists, so every in-between
+  // state needs representing -- none of which the server version required.
   const [data, setData] = useState<HealthResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -36,11 +26,8 @@ export default function LiveHealth() {
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       setData(await res.json());
     } catch (e) {
-      // Worth knowing: on a CORS failure the browser deliberately gives
-      // JavaScript almost nothing -- typically just "Failed to fetch". It will
-      // not tell you the status code or the body, because revealing those
-      // would itself leak cross-origin information. The real explanation is
-      // printed in the DevTools console, not handed to your catch block.
+      // A CORS failure yields only "Failed to fetch" here; the real reason is
+      // in the DevTools console, never in this catch block.
       setError(e instanceof Error ? e.message : "unknown error");
       setData(null);
     } finally {
@@ -48,9 +35,6 @@ export default function LiveHealth() {
     }
   }, []);
 
-  // Runs after the component mounts in the browser. This is the client-side
-  // equivalent of page.tsx's top-level await -- and it is strictly more
-  // machinery for the same result.
   useEffect(() => {
     load();
   }, [load]);
