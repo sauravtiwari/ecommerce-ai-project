@@ -28,14 +28,10 @@ class ProductRead(BaseModel):
     name: str
     slug: str
     description: str | None = None
-    # Serialized as the JSON string "29.99". JSON has no decimal type, and
-    # emitting a number here would reintroduce the float rounding problem.
     price: Decimal
     stock: int
     is_active: bool
     created_at: datetime
-    # Nested, so one request returns the category too. Requires the endpoint
-    # to eager-load the relationship -- otherwise N+1.
     category: CategoryRead
 
 
