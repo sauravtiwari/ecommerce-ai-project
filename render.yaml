@@ -11,9 +11,17 @@ services:
 
     buildCommand: pip install -r requirements.txt
 
+    # `alembic upgrade head` runs before the server starts, so a deploy that
+    # adds a migration applies it automatically -- production schema can never
+    # drift behind the code. It is a no-op when already up to date.
+    #
+    # It belongs here rather than in buildCommand because Render's build step
+    # has no database access. On a paid plan, preDeployCommand is the better
+    # home (it runs once per deploy rather than once per instance start).
+    #
     # --host 0.0.0.0 is required: a container bound to loopback is unreachable
     # from Render's proxy. $PORT is assigned at runtime and must not be hardcoded.
-    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    startCommand: alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port $PORT
 
     # Gates the deploy -- and since /health queries Postgres, a bad DATABASE_URL
     # fails the release instead of shipping a broken service.
