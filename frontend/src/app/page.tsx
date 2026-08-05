@@ -5,6 +5,8 @@
  * embedded in the HTML. Being server-side, this fetch is not subject to CORS.
  */
 
+import Link from "next/link";
+
 import LiveHealth from "@/components/live-health";
 import { API_BASE_URL, type HealthResponse } from "@/lib/api";
 
@@ -31,6 +33,12 @@ export default async function Home() {
         <p className="mt-2 text-sm text-zinc-500">
           Phase 1 &mdash; proving the stack end to end.
         </p>
+        <Link
+          href="/products"
+          className="mt-4 inline-block rounded-md border border-zinc-300 px-4 py-2 text-sm transition-colors hover:bg-zinc-100 dark:border-zinc-700 dark:hover:bg-zinc-900"
+        >
+          Browse the catalog &rarr;
+        </Link>
       </div>
 
       <section className="rounded-lg border border-zinc-200 p-6 dark:border-zinc-800">
