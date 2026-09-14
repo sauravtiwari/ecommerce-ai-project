@@ -8,7 +8,8 @@
 
 import Link from "next/link";
 
-import { fetchProducts, formatPrice } from "@/lib/api";
+import ProductRail from "@/components/product-rail";
+import { fetchProducts, fetchTrending, formatPrice } from "@/lib/api";
 
 const PAGE_SIZE = 12;
 
@@ -30,11 +31,16 @@ export default async function ProductsPage({
   const { category, page } = await searchParams;
   const currentPage = Math.max(1, Number(page) || 1);
 
-  const data = await fetchProducts({
+  // Both requests start before either is awaited, so they run in parallel
+  // rather than one after the other.
+  const productsPromise = fetchProducts({
     limit: PAGE_SIZE,
     offset: (currentPage - 1) * PAGE_SIZE,
     categorySlug: category,
   });
+  const trendingPromise = fetchTrending(8);
+
+  const [data, trending] = await Promise.all([productsPromise, trendingPromise]);
 
   const totalPages = Math.max(1, Math.ceil(data.total / PAGE_SIZE));
 
@@ -55,7 +61,14 @@ export default async function ProductsPage({
         </p>
       </header>
 
-      <nav className="mb-8 flex flex-wrap gap-2">
+      <ProductRail
+        title="Trending Now"
+        subtitle={trending.strategy}
+        items={trending.items}
+        showScore
+      />
+
+      <nav className="mb-8 mt-10 flex flex-wrap gap-2">
         {CATEGORIES.map((c) => {
           const active = (category ?? "") === c.slug;
           return (

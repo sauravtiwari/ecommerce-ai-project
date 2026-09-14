@@ -1,0 +1,66 @@
+{
+  "phase": 4,
+  "generated_at": "2026-09-11T19:04:55.037973+00:00",
+  "cutoff": "2026-09-04T19:04:55.037973+00:00",
+  "test_days": 7,
+  "k": 10,
+  "test_sessions": 281,
+  "results": {
+    "random": {
+      "precision_at_k": 0.0071174377224199285,
+      "recall_at_k": 0.03185053380782918,
+      "hit_rate_at_k": 0.0711743772241993,
+      "sessions": 281
+    },
+    "popularity (no decay)": {
+      "precision_at_k": 0.15480427046263345,
+      "recall_at_k": 0.8336892052194542,
+      "hit_rate_at_k": 0.9572953736654805,
+      "sessions": 281
+    },
+    "trending (half-life 96h)": {
+      "precision_at_k": 0.15480427046263345,
+      "recall_at_k": 0.8336892052194542,
+      "hit_rate_at_k": 0.9572953736654805,
+      "sessions": 281
+    }
+  },
+  "recommendations": {
+    "random": [
+      5,
+      45,
+      29,
+      15,
+      9,
+      3,
+      41,
+      38,
+      40,
+      32
+    ],
+    "popularity (no decay)": [
+      46,
+      22,
+      8,
+      11,
+      10,
+      48,
+      4,
+      2,
+      16,
+      50
+    ],
+    "trending (half-life 96h)": [
+      46,
+      22,
+      8,
+      48,
+      11,
+      4,
+      10,
+      16,
+      50,
+      2
+    ]
+  }
+}

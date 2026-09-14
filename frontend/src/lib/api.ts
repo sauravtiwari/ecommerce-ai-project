@@ -90,3 +90,86 @@ export async function fetchProduct(id: number): Promise<Product | null> {
 export function formatPrice(price: string): string {
   return `£${price}`;
 }
+
+// --- Recommendations (Phase 4) ---
+
+/** Mirrors RecommendedProduct. `score` is exposed so a rail is debuggable. */
+export type RecommendedProduct = {
+  product: Product;
+  score: number;
+};
+
+/** Mirrors RecommendationList. */
+export type RecommendationResponse = {
+  items: RecommendedProduct[];
+  strategy: string;
+  generated_at: string;
+};
+
+export async function fetchTrending(limit = 8): Promise<RecommendationResponse> {
+  const res = await fetch(`${API_BASE_URL}/recommendations/trending?limit=${limit}`, {
+    // Must not be cached: the checkpoint is that viewing a product repeatedly
+    // moves it up this rail on the next reload.
+    cache: "no-store",
+  });
+  if (!res.ok) throw new Error(`Failed to load trending: HTTP ${res.status}`);
+  return res.json();
+}
+
+export async function fetchSimilar(
+  productId: number,
+  limit = 4,
+): Promise<RecommendationResponse | null> {
+  const res = await fetch(
+    `${API_BASE_URL}/recommendations/similar/${productId}?limit=${limit}`,
+    { cache: "no-store" },
+  );
+  if (res.status === 404) return null;
+  if (!res.ok) throw new Error(`Failed to load similar: HTTP ${res.status}`);
+  return res.json();
+}
+
+// --- Event tracking (Phase 4) ---
+
+const SESSION_KEY = "ecommerce_session_id";
+
+/**
+ * A stable anonymous id for this browser, created on first use.
+ *
+ * Not authentication and not a secret -- just a way to group one visitor's
+ * events before accounts exist in Phase 5. Browser-only: localStorage does not
+ * exist on the server, so this must never be called during SSR.
+ */
+export function getSessionId(): string {
+  let id = localStorage.getItem(SESSION_KEY);
+  if (!id) {
+    id = crypto.randomUUID();
+    localStorage.setItem(SESSION_KEY, id);
+  }
+  return id;
+}
+
+/**
+ * Fire-and-forget event recording.
+ *
+ * Deliberately swallows errors: analytics failing must never break the page
+ * the user is actually trying to read.
+ */
+export async function recordEvent(
+  eventType: "view" | "add_to_cart",
+  productId: number,
+): Promise<void> {
+  try {
+    await fetch(`${API_BASE_URL}/events`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        event_type: eventType,
+        product_id: productId,
+        session_id: getSessionId(),
+      }),
+    });
+  } catch {
+    // Intentionally ignored.
+  }
+}

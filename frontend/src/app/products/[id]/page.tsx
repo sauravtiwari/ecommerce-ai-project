@@ -6,7 +6,9 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
-import { fetchProduct, formatPrice } from "@/lib/api";
+import ProductRail from "@/components/product-rail";
+import ViewTracker from "@/components/view-tracker";
+import { fetchProduct, fetchSimilar, formatPrice } from "@/lib/api";
 
 export default async function ProductDetailPage({
   params,
@@ -21,8 +23,13 @@ export default async function ProductDetailPage({
   // rendering an empty shell that looks broken.
   if (!product) notFound();
 
+  const similar = await fetchSimilar(product.id, 4);
+
   return (
     <main className="mx-auto max-w-3xl p-8">
+      {/* Renders nothing; POSTs a `view` event from the browser on mount. */}
+      <ViewTracker productId={product.id} />
+
       <Link
         href={`/products?category=${product.category.slug}`}
         className="text-sm text-zinc-500 hover:underline"
@@ -68,6 +75,14 @@ export default async function ProductDetailPage({
           </dd>
         </dl>
       </article>
+
+      {similar && (
+        <ProductRail
+          title="Similar products"
+          subtitle={similar.strategy}
+          items={similar.items}
+        />
+      )}
     </main>
   );
 }

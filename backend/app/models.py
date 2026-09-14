@@ -3,7 +3,16 @@
 from datetime import datetime
 from decimal import Decimal
 
-from sqlalchemy import DateTime, ForeignKey, Numeric, String, Text, func
+from sqlalchemy import (
+    CheckConstraint,
+    DateTime,
+    ForeignKey,
+    Index,
+    Numeric,
+    String,
+    Text,
+    func,
+)
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
@@ -48,3 +57,41 @@ class Product(Base):
     )
 
     category: Mapped["Category"] = relationship(back_populates="products")
+    events: Mapped[list["Event"]] = relationship(back_populates="product")
+
+
+class Event(Base):
+    """One implicit-feedback signal: somebody viewed or carted a product.
+
+    This table only ever grows, and every recommender from Phase 4 onward reads
+    from it. Rows are facts about the past, so nothing here is ever updated.
+    """
+
+    __tablename__ = "events"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    event_type: Mapped[str] = mapped_column(String(20))
+    product_id: Mapped[int] = mapped_column(ForeignKey("products.id"), index=True)
+    # There is no users table until Phase 5, so visitors are identified by an
+    # anonymous id the browser generates and keeps in localStorage. Real
+    # analytics works this way too -- most traffic is logged out. Phase 5 adds
+    # a nullable user_id beside this via its own migration.
+    session_id: Mapped[str] = mapped_column(String(64), index=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+    product: Mapped["Product"] = relationship(back_populates="events")
+
+    __table_args__ = (
+        # The database refuses a bad event_type even if a bug bypasses Pydantic.
+        # Validation at the edge is convenience; a constraint here is a
+        # guarantee.
+        CheckConstraint(
+            "event_type IN ('view', 'add_to_cart', 'purchase')",
+            name="ck_events_event_type",
+        ),
+        # The trending query filters by time and groups by product, so the
+        # composite index covers it in one structure.
+        Index("ix_events_created_at_product", "created_at", "product_id"),
+    )

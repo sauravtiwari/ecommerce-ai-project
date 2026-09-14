@@ -14,7 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import get_settings
 from app.db import engine, get_session
-from app.routers import products
+from app.routers import events, products, recommendations
 
 settings = get_settings()
 
@@ -40,6 +40,8 @@ app.add_middleware(
 )
 
 app.include_router(products.router)
+app.include_router(events.router)
+app.include_router(recommendations.router)
 
 
 class HealthResponse(BaseModel):
