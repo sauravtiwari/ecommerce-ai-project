@@ -4,6 +4,7 @@ from datetime import datetime
 from decimal import Decimal
 
 from sqlalchemy import (
+    Boolean,
     CheckConstraint,
     DateTime,
     ForeignKey,
@@ -60,6 +61,31 @@ class Product(Base):
     events: Mapped[list["Event"]] = relationship(back_populates="product")
 
 
+class User(Base):
+    """A registered account.
+
+    Nothing here is ever the password itself -- only a bcrypt hash of it. If
+    this table leaks, the attacker still has to brute-force every row.
+    """
+
+    __tablename__ = "users"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    # unique is enforced by the database, not just by a check in the register
+    # endpoint: two simultaneous signups can both pass that check before
+    # either one inserts.
+    email: Mapped[str] = mapped_column(String(255), unique=True, index=True)
+    hashed_password: Mapped[str] = mapped_column(String(128))
+    full_name: Mapped[str | None] = mapped_column(String(200))
+    # Lets an account be disabled without deleting it and orphaning its orders.
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+    events: Mapped[list["Event"]] = relationship(back_populates="user")
+
+
 class Event(Base):
     """One implicit-feedback signal: somebody viewed or carted a product.
 
@@ -72,16 +98,22 @@ class Event(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     event_type: Mapped[str] = mapped_column(String(20))
     product_id: Mapped[int] = mapped_column(ForeignKey("products.id"), index=True)
-    # There is no users table until Phase 5, so visitors are identified by an
-    # anonymous id the browser generates and keeps in localStorage. Real
-    # analytics works this way too -- most traffic is logged out. Phase 5 adds
-    # a nullable user_id beside this via its own migration.
+    # Visitors are identified by an anonymous id the browser generates and
+    # keeps in localStorage. Kept even now that accounts exist: most traffic is
+    # logged out, and this is the only handle on those people.
     session_id: Mapped[str] = mapped_column(String(64), index=True)
+    # Nullable because logged-out events are the normal case. When it is set,
+    # it beats session_id -- it follows one person across devices, which is
+    # what the collaborative filtering in Phase 7 actually needs.
+    user_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id"), nullable=True, index=True
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
 
     product: Mapped["Product"] = relationship(back_populates="events")
+    user: Mapped["User | None"] = relationship(back_populates="events")
 
     __table_args__ = (
         # The database refuses a bad event_type even if a bug bypasses Pydantic.

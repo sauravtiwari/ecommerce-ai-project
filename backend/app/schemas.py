@@ -8,7 +8,7 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 EventType = Literal["view", "add_to_cart", "purchase"]
 
@@ -83,6 +83,9 @@ class EventRead(BaseModel):
     event_type: EventType
     product_id: int
     session_id: str
+    # Echoed back so you can see who the server attributed this to. Never read
+    # from the request -- it comes from the auth cookie.
+    user_id: int | None = None
     created_at: datetime
 
 
@@ -103,3 +106,57 @@ class RecommendationList(BaseModel):
     # version -- naming it from the start costs nothing.
     strategy: str
     generated_at: datetime
+
+
+# --- Auth (Phase 5) ---
+
+
+class UserCreate(BaseModel):
+    """A registration request.
+
+    EmailStr rejects malformed addresses before any database work happens --
+    validation at the edge, so the endpoint body only ever sees plausible input.
+    """
+
+    email: EmailStr
+    # 8 is a floor, not a policy. max_length matters more than it looks:
+    # bcrypt ignores anything past 72 bytes, and an unbounded password field is
+    # a free CPU-exhaustion vector given how slow hashing deliberately is.
+    password: str = Field(min_length=8, max_length=72)
+    full_name: str | None = Field(default=None, max_length=200)
+
+
+class UserLogin(BaseModel):
+    """A login request. No length rules -- old accounts may predate them."""
+
+    email: EmailStr
+    password: str
+
+
+class UserRead(BaseModel):
+    """A user as the API returns them.
+
+    hashed_password is absent by design. This is why schemas are separate from
+    models: the hash cannot leak through an endpoint that forgot to exclude it,
+    because there is no field for it to leak into.
+    """
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    email: EmailStr
+    full_name: str | None = None
+    is_active: bool
+    created_at: datetime
+
+
+class AuthResponse(BaseModel):
+    """What login and register return.
+
+    No token in the body: the tokens are set as httpOnly cookies, which is the
+    entire point of that choice. Returning them here as well would put them
+    back within reach of any script on the page.
+    """
+
+    user: UserRead
+    expires_in: int  # access token lifetime in seconds, so the client can pre-refresh

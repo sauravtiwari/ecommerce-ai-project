@@ -34,6 +34,12 @@ export default async function Home() {
           Phase 1 &mdash; proving the stack end to end.
         </p>
         <Link
+          href="/account"
+          className="mt-4 mr-2 inline-block rounded-md border border-zinc-300 px-4 py-2 text-sm transition-colors hover:bg-zinc-100 dark:border-zinc-700 dark:hover:bg-zinc-900"
+        >
+          Your account &rarr;
+        </Link>
+        <Link
           href="/products"
           className="mt-4 inline-block rounded-md border border-zinc-300 px-4 py-2 text-sm transition-colors hover:bg-zinc-100 dark:border-zinc-700 dark:hover:bg-zinc-900"
         >

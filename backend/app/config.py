@@ -25,6 +25,20 @@ class Settings(BaseSettings):
     # than let it connect somewhere unintended.
     database_url: str
 
+    # No default, for the same reason as database_url: a missing secret must
+    # stop the app, never fall back to a guessable value. Anyone holding this
+    # string can mint a token for any account.
+    jwt_secret_key: str
+    jwt_algorithm: str = "HS256"
+
+    # Short, because a stateless JWT cannot be revoked -- once issued it is
+    # valid until it expires, even if the account is deleted. 30 minutes caps
+    # how long a stolen access token is useful.
+    access_token_expire_minutes: int = 30
+    # Long, because it is only ever sent to /auth/refresh, so it is exposed on
+    # far fewer requests than the access token.
+    refresh_token_expire_days: int = 7
+
     # NoDecode is required: pydantic-settings JSON-decodes complex types inside
     # the env source, before validators run, so a plain comma-separated string
     # would fail to parse.

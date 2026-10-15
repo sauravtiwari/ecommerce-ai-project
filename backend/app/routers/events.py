@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db import get_session
+from app.dependencies import OptionalUser
 from app.models import Event, Product
 from app.schemas import EventCreate, EventRead
 
@@ -16,6 +17,7 @@ router = APIRouter(prefix="/events", tags=["events"])
 async def record_event(
     payload: EventCreate,
     session: Annotated[AsyncSession, Depends(get_session)],
+    user: OptionalUser = None,
 ) -> Event:
     """Record a view / add_to_cart / purchase.
 
@@ -31,7 +33,10 @@ async def record_event(
             detail=f"Product {payload.product_id} does not exist",
         )
 
-    event = Event(**payload.model_dump())
+    # OptionalUser, not CurrentUser: logged-out traffic is the normal case and
+    # must keep being recorded. The client never sends user_id -- it is taken
+    # from the verified cookie, so nobody can log events as somebody else.
+    event = Event(**payload.model_dump(), user_id=user.id if user else None)
     session.add(event)
     await session.commit()
     # Events have no relationships to serialize, so unlike create_product this

@@ -8,6 +8,17 @@
 export const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8000";
 
+/**
+ * Where BROWSER requests go. Not the API's real URL: a same-origin path that
+ * next.config.ts rewrites to the backend.
+ *
+ * This is what makes cookie auth work. A direct fetch to the API is cross-site,
+ * so SameSite=Lax would drop the auth cookie and middleware could not read it.
+ * Routed through here, everything is first-party. Server Components keep using
+ * API_BASE_URL -- they have no cookies to lose and skip a pointless hop.
+ */
+export const BROWSER_API_BASE = "/api/backend";
+
 /** Mirrors HealthResponse in backend/app/main.py; also published at /openapi.json. */
 export type HealthResponse = {
   status: "ok" | "degraded";
@@ -160,8 +171,11 @@ export async function recordEvent(
   productId: number,
 ): Promise<void> {
   try {
-    await fetch(`${API_BASE_URL}/events`, {
+    await fetch(`${BROWSER_API_BASE}/events`, {
+      // Same-origin now, so the auth cookie rides along and the backend can
+      // attribute this view to the signed-in account instead of a browser id.
       method: "POST",
+      credentials: "include",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         event_type: eventType,
@@ -172,4 +186,94 @@ export async function recordEvent(
   } catch {
     // Intentionally ignored.
   }
+}
+
+
+// --- Auth (Phase 5) ---
+
+/** Mirrors UserRead in backend/app/schemas.py. */
+export type User = {
+  id: number;
+  email: string;
+  full_name: string | null;
+  is_active: boolean;
+  created_at: string;
+};
+
+/** Mirrors AuthResponse. No token field: the tokens are httpOnly cookies. */
+export type AuthResponse = {
+  user: User;
+  expires_in: number;
+};
+
+/** Thrown with the backend's own message so forms can show something useful. */
+export class ApiError extends Error {
+  constructor(
+    message: string,
+    readonly status: number,
+  ) {
+    super(message);
+  }
+}
+
+async function authRequest(
+  path: string,
+  body?: unknown,
+): Promise<Response> {
+  const res = await fetch(`${BROWSER_API_BASE}${path}`, {
+    method: "POST",
+    headers: body ? { "Content-Type": "application/json" } : undefined,
+    // Tells fetch to accept and store the Set-Cookie coming back. Without it
+    // login "succeeds" and the browser silently keeps no session.
+    credentials: "include",
+    body: body ? JSON.stringify(body) : undefined,
+  });
+
+  if (!res.ok) {
+    const detail = await res.json().catch(() => null);
+    // FastAPI puts a string in `detail` for HTTPException and an array of
+    // field errors there for a 422.
+    const message =
+      typeof detail?.detail === "string"
+        ? detail.detail
+        : Array.isArray(detail?.detail)
+          ? detail.detail[0]?.msg ?? "Invalid input"
+          : `Request failed (HTTP ${res.status})`;
+    throw new ApiError(message, res.status);
+  }
+  return res;
+}
+
+export async function register(
+  email: string,
+  password: string,
+  fullName?: string,
+): Promise<AuthResponse> {
+  const res = await authRequest("/auth/register", {
+    email,
+    password,
+    full_name: fullName || null,
+  });
+  return res.json();
+}
+
+export async function login(
+  email: string,
+  password: string,
+): Promise<AuthResponse> {
+  const res = await authRequest("/auth/login", { email, password });
+  return res.json();
+}
+
+export async function logout(): Promise<void> {
+  await authRequest("/auth/logout");
+}
+
+/** The signed-in user, or null. Used by client components to render state. */
+export async function fetchMe(): Promise<User | null> {
+  const res = await fetch(`${BROWSER_API_BASE}/auth/me`, {
+    credentials: "include",
+    cache: "no-store",
+  });
+  return res.ok ? res.json() : null;
 }

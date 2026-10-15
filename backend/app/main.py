@@ -14,7 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import get_settings
 from app.db import engine, get_session
-from app.routers import events, products, recommendations
+from app.routers import auth, events, products, recommendations
 
 settings = get_settings()
 
@@ -39,6 +39,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.include_router(auth.router)
 app.include_router(products.router)
 app.include_router(events.router)
 app.include_router(recommendations.router)
