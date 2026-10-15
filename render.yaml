@@ -36,6 +36,10 @@ services:
       - key: DATABASE_URL
         sync: false
 
+      # Required to sign and verify JWTs; provide the value in the Render dashboard.
+      - key: JWT_SECRET_KEY
+        sync: false
+
       # Your Vercel URL, no trailing slash (the Origin header never has one).
       - key: CORS_ORIGINS
         sync: false
